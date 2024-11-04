@@ -42,6 +42,9 @@ export class OrderItem {
 
   @Field()
   color: string;
+
+  @Field()
+  fgColor: string;
 }
 
 const STEP = 16384;
@@ -119,40 +122,73 @@ export class OrderItemResolver implements OnModuleInit {
     return true;
   }
 
+  async normalizeOrderItems(
+    orderItems: OrderItem[],
+    userId: string,
+    itemId: string,
+    position: number,
+  ) {
+    const updatedItems = orderItems
+      .map((item) => {
+        if (item.id === itemId) {
+          return { ...item, position };
+        }
+        return item;
+      })
+      .sort((a, b) => a.position - b.position)
+      .map((item, index) => ({
+        ...item,
+        position: (index + 1) * STEP,
+      }));
+
+    const promises = updatedItems.map((item) =>
+      this.prisma.orderItem.update({
+        data: { position: item.position },
+        where: { id: item.id, userId },
+      }),
+    );
+
+    return this.prisma.$transaction(promises);
+  }
+
   @Mutation(() => OrderItem)
   async updateOrderItemPosition(
     @UserId() userId: string,
     @Args('id') id: string,
     @Args('newPosition') newPosition: number,
   ): Promise<OrderItem> {
-    if (newPosition <= THRESHOLD) {
-      const orderItems = await this.prisma.orderItem.findMany({
-        orderBy: { position: 'asc' },
-        where: { userId },
-      });
+    const _orderItems = await this.prisma.orderItem.findMany({
+      orderBy: { position: 'asc' },
+      where: { userId },
+    });
 
-      const updatedItems = orderItems
-        .map((item) => {
-          if (item.id === id) {
-            return { ...item, position: newPosition };
-          }
+    let currentItem = _orderItems.find((item) => item.id === id);
 
-          return item;
-        })
-        .sort((a, b) => a.position - b.position)
-        .map((item, index) => ({
-          ...item,
-          position: (index + 1) * STEP,
-        }));
+    if (!currentItem) {
+      throw new Error('Item not found');
+    }
 
-      const promises = updatedItems.map((item) =>
-        this.prisma.orderItem.update({
-          data: { position: item.position },
-          where: { id: item.id, userId },
-        }),
+    const previousItem = _orderItems
+      .filter((item) => item.id !== id)
+      .reverse()
+      .find((item) => item.position < newPosition);
+
+    const nextItem = _orderItems
+      .filter((item) => item.id !== id)
+      .find((item) => item.position > newPosition);
+
+    if (
+      (nextItem && Math.abs(newPosition - nextItem.position) <= THRESHOLD) ||
+      (previousItem &&
+        Math.abs(newPosition - previousItem.position) <= THRESHOLD) ||
+      newPosition <= THRESHOLD
+    ) {
+      const updatedItems = await this.normalizeOrderItems(
+        _orderItems,
+        userId,
+        id,
+        newPosition,
       );
-
-      await this.prisma.$transaction(promises);
 
       return updatedItems.find((item) => item.id === id);
     }
