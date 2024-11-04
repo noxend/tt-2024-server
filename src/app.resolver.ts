@@ -47,16 +47,11 @@ export class OrderItem {
 const STEP = 16384;
 
 const COLORS = [
-  '#577590',
-  '#7E8B7C',
-  '#A5A068',
-  '#F3CA40',
-  '#F3B841',
-  '#F2A541',
-  '#F19846',
-  '#F08A4B',
-  '#E48A61',
-  '#D78A76',
+  { bg: 'rgb(246, 81, 29)', fg: 'white' },
+  { bg: 'rgb(127, 184, 0)', fg: 'white' },
+  { bg: 'rgb(255, 180, 0)', fg: 'black' },
+  { bg: 'rgb(0, 166, 237)', fg: 'white' },
+  { bg: 'rgb(13, 44, 84)', fg: 'white' },
 ];
 
 const ITEMS_COUNT = COLORS.length;
@@ -83,7 +78,8 @@ export class OrderItemResolver implements OnModuleInit {
         username,
         items: {
           create: Array.from({ length: ITEMS_COUNT }, (_, i) => ({
-            color: COLORS[i % COLORS.length],
+            fgColor: COLORS[i % COLORS.length].fg,
+            color: COLORS[i % COLORS.length].bg,
             position: (i + 1) * STEP,
             label: `Item ${i + 1}`,
           })),
@@ -112,7 +108,8 @@ export class OrderItemResolver implements OnModuleInit {
 
     await this.prisma.orderItem.createMany({
       data: Array.from({ length: ITEMS_COUNT }, (_, i) => ({
-        color: COLORS[i % COLORS.length],
+        fgColor: COLORS[i % COLORS.length].fg,
+        color: COLORS[i % COLORS.length].bg,
         position: (i + 1) * STEP,
         label: `Item ${i + 1}`,
         userId,

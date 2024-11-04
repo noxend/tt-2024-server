@@ -20,4 +20,5 @@ model OrderItem {
   user     User   @relation(fields: [userId], references: [id])
   userId   String
   color    String
+  fgColor  String @default("#000000")
 }
